@@ -1,3 +1,4 @@
+using Auth.Application.Interfaces;
 using Auth.Domain.Entities;
 using Auth.Infrastructure.Data.Configurations;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
@@ -23,10 +24,16 @@ public class AuthDbContext : IdentityDbContext<ApplicationUser, ApplicationRole,
     public DbSet<ClientApplication> ClientApplications => Set<ClientApplication>();
     public DbSet<Scope> Scopes => Set<Scope>();
     public DbSet<ClientScope> ClientScopes => Set<ClientScope>();
+    public DbSet<ReferenceToken> ReferenceTokens => Set<ReferenceToken>();
+    public DbSet<RequiredDocument> RequiredDocuments => Set<RequiredDocument>();
+    public DbSet<VerificationRequest> VerificationRequests => Set<VerificationRequest>();
+    public DbSet<UserDocument> UserDocuments => Set<UserDocument>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
     public DbSet<Product> Products => Set<Product>();
+    public DbSet<UserDevice> UserDevices => Set<UserDevice>();
+    public DbSet<RoleDeviceLimit> RoleDeviceLimits => Set<RoleDeviceLimit>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -35,14 +42,6 @@ public class AuthDbContext : IdentityDbContext<ApplicationUser, ApplicationRole,
         // Apply all configurations from the current assembly
         builder.ApplyConfigurationsFromAssembly(typeof(AuthDbContext).Assembly);
     }
-}
-
-/// <summary>
-/// Provides the current tenant context (set by middleware).
-/// </summary>
-public interface ITenantContext
-{
-    Guid? TenantId { get; }
 }
 
 public class TenantContext : ITenantContext

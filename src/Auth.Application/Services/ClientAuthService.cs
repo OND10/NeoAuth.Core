@@ -119,6 +119,26 @@ public class ClientAuthService : IClientAuthService
         return Result.Success("Client scopes updated successfully.");
     }
 
+    public async Task<Result<PagedResult<ClientApplicationResponse>>> GetAllAsync(PaginationFilter filter)
+    {
+        var paged = await _clientRepository.GetAllAsync(filter);
+
+        var mapped = new PagedResult<ClientApplicationResponse>(
+            items: paged.Items.Select(c => new ClientApplicationResponse(
+                Id: c.Id,
+                ClientId: c.ClientId,
+                Name: c.Name,
+                Description: c.Description,
+                IsActive: c.IsActive,
+                CreatedAt: c.CreatedAt,
+                AllowedScopes: c.AllowedScopes.Select(s => s.Scope.Name))),
+            totalCount: paged.TotalCount,
+            pageNumber: paged.PageNumber,
+            pageSize: paged.PageSize);
+
+        return Result.Success(mapped);
+    }
+
     // ──── Private Helpers ────
 
     private static string GenerateClientSecret()

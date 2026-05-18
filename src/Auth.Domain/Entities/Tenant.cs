@@ -1,12 +1,15 @@
+using Auth.Domain.Common;
+
 namespace Auth.Domain.Entities;
 
-public class Tenant
+public class Tenant : AuditableEntity
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string? Subdomain { get; set; }
     public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>Tenant-level device limit. Null = unlimited (falls back to global default).</summary>
+    public int? MaxDevicesPerUser { get; set; }
 
     // Navigation properties
     public ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();

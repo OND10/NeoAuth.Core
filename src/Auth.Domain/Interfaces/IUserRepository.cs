@@ -40,6 +40,8 @@ public interface IUserRepository
     Task<string> GenerateUserEmailConfirmationTokenAsync(ApplicationUser user);
     Task<ApplicationUser?> GetByGoogleIdAsync(string googleId, CancellationToken cancellationToken = default);
     Task<bool> UpdateLastActiveAsync(Guid userId);
+    Task<string> GenerateDeviceVerificationTokenAsync(ApplicationUser user);
+    Task<bool> VerifyDeviceVerificationTokenAsync(ApplicationUser user, string code);
 }
 
 public enum SignInResultType

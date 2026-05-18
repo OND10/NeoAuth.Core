@@ -1,11 +1,11 @@
+using Auth.Domain.Common;
+
 namespace Auth.Domain.Entities;
 
-public class Permission
+public class Permission : AuditableEntity
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Hierarchical groups
     public Guid? ParentId { get; set; }

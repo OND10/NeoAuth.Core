@@ -1,5 +1,7 @@
 using Auth.Application.DTOs;
 using Auth.Application.Interfaces;
+using Auth.Application.Services;
+using Auth.Domain.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,6 +17,16 @@ public class ClientController : ControllerBase
     {
         _clientAuthService = clientAuthService;
     }
+
+    [HttpGet]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAll([FromQuery] PaginationFilter filter)
+    {
+        var result = await _clientAuthService.GetAllAsync(filter);
+        return Ok(result);
+    }
+
+
 
     [HttpPost("authenticate")]
     public async Task<IActionResult> Authenticate([FromBody] ClientCredentialsRequest request)

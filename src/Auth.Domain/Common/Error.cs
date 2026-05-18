@@ -1,3 +1,5 @@
+using System.Runtime.CompilerServices;
+
 namespace Auth.Domain.Common;
 
 public sealed record Error(string Code, string Message)
@@ -39,4 +41,14 @@ public sealed record Error(string Code, string Message)
     // General
     public static readonly Error InternalError = new("General.InternalError", "An unexpected error occurred.");
     public static readonly Error UserEmailConfirmationFailed = new("User.EmailConfirmationFailed", "Email confirmation failed.");
+    
+    public static Error NotFound(string code, string message)
+    {
+        return new(code, message);
+    }
+
+    public static Error Validation(string code,  string message)
+    {
+        return new(code, message);
+    }
 }

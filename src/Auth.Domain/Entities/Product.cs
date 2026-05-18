@@ -1,9 +1,9 @@
+using Auth.Domain.Common;
+
 namespace Auth.Domain.Entities;
 
-public class Product
+public class Product : AuditableEntity
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public decimal Price { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

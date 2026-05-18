@@ -36,7 +36,40 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        // Intercept IP Address and User-Agent
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var userAgent = HttpContext.Request.Headers["User-Agent"].ToString();
+
+        // Update request object if it was provided
+        if (request.Device != null)
+        {
+            var updatedRequest = request with 
+            { 
+                IpAddress = ipAddress,
+                Device = request.Device with 
+                { 
+                    // Fallback to User-Agent if Platform/DeviceType not explicitly provided
+                    Platform = request.Device.Platform ?? userAgent
+                }
+            };
+            
+            var resultWithDevice = await _authService.LoginAsync(updatedRequest);
+            if (resultWithDevice.IsFailure) return Unauthorized(resultWithDevice);
+            
+            // If device requires verification, we return Ok (or a specific status)
+            // The client will see RequiresDeviceVerification = true
+            return Ok(resultWithDevice);
+        }
+
         var result = await _authService.LoginAsync(request);
+        if (result.IsFailure) return Unauthorized(result);
+        return Ok(result);
+    }
+
+    [HttpPost("verify-device")]
+    public async Task<IActionResult> VerifyDevice([FromBody] VerifyDeviceRequest request)
+    {
+        var result = await _authService.VerifyDeviceAsync(request);
         if (result.IsFailure) return Unauthorized(result);
         return Ok(result);
     }
@@ -111,33 +144,25 @@ public class AuthController : ControllerBase
     [HttpGet("google/callback")]
     public async Task<IActionResult> GoogleCallback()
     {
-        try
+        var result = await HttpContext.AuthenticateAsync("Google");
+        if (!result.Succeeded)
         {
-            var result = await HttpContext.AuthenticateAsync("Google");
-            if (!result.Succeeded)
-            {
-                _logger.LogWarning("Google authentication failed");
-                return Redirect($"{_options.Value.FrontendUrl}?error=auth_failed");
-            }
-
-            var googleToken = result.Properties?.GetTokenValue("access_token");
-            if (string.IsNullOrEmpty(googleToken))
-            {
-                _logger.LogWarning("No access token received from Google");
-                return Redirect($"{_options.Value.FrontendUrl}?error=no_token");
-            }
-
-            var authResult = await _authService.AuthenticateWithGoogleAsync(googleToken);
-
-            // In a real application, you might want to set secure HTTP-only cookies
-            // or redirect to a frontend page that handles the tokens
-            return Redirect($"{_options.Value.FrontendUrl}?access_token={authResult.Value.AccessToken}&refresh_token={authResult.Value.RefreshToken}");
+            _logger.LogWarning("Google authentication failed");
+            return Redirect($"{_options.Value.FrontendUrl}?error=auth_failed");
         }
-        catch (Exception ex)
+
+        var googleToken = result.Properties?.GetTokenValue("access_token");
+        if (string.IsNullOrEmpty(googleToken))
         {
-            _logger.LogError(ex, "Error during Google OAuth callback");
-            return Redirect($"{_options.Value.FrontendUrl}?error=callback_failed");
+            _logger.LogWarning("No access token received from Google");
+            return Redirect($"{_options.Value.FrontendUrl}?error=no_token");
         }
+
+        var authResult = await _authService.AuthenticateWithGoogleAsync(googleToken);
+
+        // In a real application, you might want to set secure HTTP-only cookies
+        // or redirect to a frontend page that handles the tokens
+        return Redirect($"{_options.Value.FrontendUrl}?access_token={authResult.Value.AccessToken}&refresh_token={authResult.Value.RefreshToken}");
     }
 
     /// <summary>
@@ -148,27 +173,14 @@ public class AuthController : ControllerBase
     [HttpPost("google/token")]
     public async Task<ActionResult<AuthTokenDto>> AuthenticateWithGoogle([FromBody] GoogleAuthRequest request)
     {
-        try
+        if (string.IsNullOrEmpty(request.GoogleToken))
         {
-            if (string.IsNullOrEmpty(request.GoogleToken))
-            {
-                return BadRequest(new { error = "Google token is required" });
-            }
+            return BadRequest(new { error = "Google token is required" });
+        }
 
-            var result = await _authService.AuthenticateWithGoogleAsync(request.GoogleToken);
+        var result = await _authService.AuthenticateWithGoogleAsync(request.GoogleToken);
         if (result.IsFailure) return Unauthorized(result);
-            return Ok(result);
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            _logger.LogWarning(ex, "Google authentication failed");
-            return Unauthorized(new { error = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error during Google authentication");
-            return StatusCode(500, new { error = "Authentication failed" });
-        }
+        return Ok(result);
     }
 
 
@@ -185,6 +197,21 @@ public class AuthController : ControllerBase
                 return Ok(new { Message = "Email confirmed successfully." });
         }
         return BadRequest(new { Message = "Email confirmation failed." });
+    }
+
+    [HttpPost("client/token")]
+    public async Task<IActionResult> AuthenticateClient([FromBody] ClientCredentialsRequest request)
+    {
+        var result = await _authService.AuthenticateClientAsync(request);
+        if (result.IsFailure) return Unauthorized(result);
+        return Ok(result);
+    }
+
+    [HttpPost("introspect")]
+    public async Task<IActionResult> Introspect([FromBody] IntrospectionRequest request)
+    {
+        var result = await _authService.IntrospectAsync(request);
+        return Ok(result);
     }
 
 }

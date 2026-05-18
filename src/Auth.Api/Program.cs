@@ -49,8 +49,12 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseStaticFiles();
 
 // ──── Middleware Pipeline ────
+app.UseMiddleware<ExceptionMiddleware>();
+app.UseMiddleware<ReferenceTokenMiddleware>();
+
 // Order matters: Authentication → TenantResolution → ClaimsEnrichment → Authorization
 app.UseAuthentication();
 app.UseMiddleware<TenantResolutionMiddleware>();

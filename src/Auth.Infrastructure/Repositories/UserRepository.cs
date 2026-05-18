@@ -118,4 +118,15 @@ public class UserRepository : IUserRepository
 		await _userManager.UpdateAsync(user);
 		return true;
 	}
+
+    public async Task<string> GenerateDeviceVerificationTokenAsync(ApplicationUser user)
+    {
+        // Use the built-in email token provider for generating a 6-digit OTP
+        return await _userManager.GenerateUserTokenAsync(user, TokenOptions.DefaultEmailProvider, "DeviceVerification");
+    }
+
+    public async Task<bool> VerifyDeviceVerificationTokenAsync(ApplicationUser user, string code)
+    {
+        return await _userManager.VerifyUserTokenAsync(user, TokenOptions.DefaultEmailProvider, "DeviceVerification", code);
+    }
 }

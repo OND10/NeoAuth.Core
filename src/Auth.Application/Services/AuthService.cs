@@ -7,6 +7,7 @@ using Auth.Domain.Interfaces;
 using Auth.Application.Configuration;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using System.Security.Claims;
 
 namespace Auth.Application.Services;
 
@@ -15,34 +16,40 @@ public class AuthService : IAuthService
     private readonly IUserRepository _userRepository;
     private readonly ITokenService _tokenService;
     private readonly IRefreshTokenRepository _refreshTokenRepository;
+    private readonly IReferenceTokenRepository _referenceTokenRepository;
+    private readonly IClientRepository _clientRepository;
+    private readonly IClaimsService _claimsService;
+    private readonly AuthOptions _options;
     private readonly IPermissionRepository _permissionRepository;
     private readonly IEmailService _emailService;
-    private readonly AuthOptions _options;
     private readonly IHttpClientFactory _httpClientFactory;
-    private readonly IClaimsService _claimsService;
-    private readonly IClientRepository _clientRepository;
+    private readonly IDeviceService _deviceService;
 
 
     public AuthService(
         IUserRepository userRepository,
         ITokenService tokenService,
         IRefreshTokenRepository refreshTokenRepository,
+        IReferenceTokenRepository referenceTokenRepository,
         IPermissionRepository permissionRepository,
         IEmailService emailService,
         IOptions<AuthOptions> options,
         IHttpClientFactory httpClientFactory,
         IClaimsService claimsService,
-        IClientRepository clientRepository)
+        IClientRepository clientRepository,
+        IDeviceService deviceService)
     {
         _userRepository = userRepository;
         _tokenService = tokenService;
         _refreshTokenRepository = refreshTokenRepository;
+        _referenceTokenRepository = referenceTokenRepository;
         _permissionRepository = permissionRepository;
         _clientRepository = clientRepository;
         _emailService = emailService;
         _options = options.Value;
         _httpClientFactory = httpClientFactory;
         _claimsService = claimsService;
+        _deviceService = deviceService;
     }
 
     public async Task<Result<ClientCredentialsResponse>> AuthenticateClientAsync(ClientCredentialsRequest request)
@@ -70,8 +77,18 @@ public class AuthService : IAuthService
             scopes = client.AllowedScopes.Select(cs => cs.Scope.Name).ToList();
         }
 
-        var token = _tokenService.GenerateClientAccessToken(client, scopes);
+        var token = _tokenService.GenerateReferenceToken();
         var refreshTokenValue = _tokenService.GenerateRefreshToken();
+
+        // Store Reference Token
+        var referenceToken = new ReferenceToken
+        {
+            Token = token,
+            ClientId = client.Id,
+            ClaimsJson = System.Text.Json.JsonSerializer.Serialize(scopes),
+            ExpiresAt = DateTime.UtcNow.AddMinutes(_options.ClientTokenExpirationMinutes)
+        };
+        await _referenceTokenRepository.AddAsync(referenceToken);
 
         var refreshToken = new RefreshToken
         {
@@ -85,7 +102,7 @@ public class AuthService : IAuthService
         return Result.Success<ClientCredentialsResponse>(new ClientCredentialsResponse(
             AccessToken: token,
             RefreshToken: refreshTokenValue,
-            ExpiresAt: DateTime.UtcNow.AddMinutes(_options.AccessTokenExpirationMinutes)), "Client authenticated successfully.");
+            ExpiresAt: DateTime.UtcNow.AddMinutes(_options.ClientTokenExpirationMinutes)), "Client authenticated successfully.");
     }
 
     public async Task<Result<TokenResponse>> LoginAsync(LoginRequest request)
@@ -104,6 +121,48 @@ public class AuthService : IAuthService
 
         if (signInResult != SignInResultType.Success)
             return Result.Failure<TokenResponse>(Error.InvalidCredentials);
+
+        // ── Device Management Integration ──────────────────────────────
+        if (request.Device is not null)
+        {
+            // Requires IDeviceService to be injected
+            // (We will inject it into AuthService)
+            var deviceResult = await _deviceService.RegisterOrUpdateDeviceAsync(
+                user.Id, request.Device, request.IpAddress, request.TenantId);
+
+            if (deviceResult.IsFailure)
+            {
+                return Result.Failure<TokenResponse>(deviceResult.Error);
+            }
+
+            var device = deviceResult.Value;
+
+            if (device.Status == DeviceStatus.PendingVerification)
+            {
+                // Generate OTP
+                var code = await _userRepository.GenerateDeviceVerificationTokenAsync(user);
+
+                // Send Email
+                await _emailService.SendDeviceVerificationEmailAsync(user.Email!, device.FriendlyName, code);
+
+                // Generate Temporary Token for verification endpoint
+                var tempToken = _tokenService.GenerateTemporaryDeviceVerificationToken(user, device.Id);
+
+                return Result.Success(new TokenResponse(
+                    AccessToken: string.Empty,
+                    RefreshToken: string.Empty,
+                    ExpiresAt: DateTime.UtcNow,
+                    RequiresDeviceVerification: true,
+                    TemporaryToken: tempToken,
+                    DeviceId: device.Id
+                ), "Device verification required. Please check your email.");
+            }
+            
+            if (device.Status == DeviceStatus.Revoked || device.Status == DeviceStatus.Blocked)
+            {
+                return Result.Failure<TokenResponse>(Error.Validation("Device.Blocked", "This device is blocked or revoked."));
+            }
+        }
 
         return await GenerateTokensForUserAsync(user, request.TenantId);
     }
@@ -131,6 +190,45 @@ public class AuthService : IAuthService
         }
 
         return Result.Success<ApplicationUser>(user, "User registered successfully.");
+    }
+
+    public async Task<Result<TokenResponse>> VerifyDeviceAsync(VerifyDeviceRequest request)
+    {
+        // 1. Validate Temporary Token
+        var principal = _tokenService.ValidateTemporaryDeviceVerificationToken(request.TemporaryToken);
+        if (principal == null)
+            return Result.Failure<TokenResponse>(Error.Validation("Token.Invalid", "Invalid or expired temporary token."));
+
+        var userIdString = principal.FindFirstValue(ClaimTypes.NameIdentifier);
+        var deviceIdString = principal.FindFirstValue("device_id");
+
+        if (!Guid.TryParse(userIdString, out var userId) || !Guid.TryParse(deviceIdString, out var tokenDeviceId))
+            return Result.Failure<TokenResponse>(Error.Validation("Token.Invalid", "Invalid token claims."));
+
+        if (tokenDeviceId != request.DeviceId)
+            return Result.Failure<TokenResponse>(Error.Validation("Device.Mismatch", "Device ID does not match token."));
+
+        var user = await _userRepository.FindByIdAsync(userId);
+        if (user == null || !user.IsActive)
+            return Result.Failure<TokenResponse>(Error.UserNotFound);
+
+        // 2. Validate OTP Code
+        var isCodeValid = await _userRepository.VerifyDeviceVerificationTokenAsync(user, request.Code);
+        if (!isCodeValid)
+            return Result.Failure<TokenResponse>(Error.Validation("Code.Invalid", "Invalid or expired verification code."));
+
+        // 3. Update Device Status
+        // Note: Using IDeviceRepository internally is tricky if it's not injected here.
+        // Let's assume IDeviceService has a method or we'll inject IDeviceRepository here just for the update.
+        // Wait, IDeviceService already has methods, but no "ActivateDevice" method. Let's add it.
+        // For now, let's call a new method on IDeviceService: ActivateDeviceAsync.
+        var activationResult = await _deviceService.ActivateDeviceAsync(userId, request.DeviceId);
+        if (activationResult.IsFailure)
+            return Result.Failure<TokenResponse>(activationResult.Error);
+
+        // 4. Generate Final Tokens
+        var tenantId = user.UserTenants.FirstOrDefault(ut => ut.IsDefault)?.TenantId;
+        return await GenerateTokensForUserAsync(user, tenantId);
     }
 
     public async Task<Result<TokenResponse>> RefreshTokenAsync(RefreshTokenRequest request)
@@ -239,35 +337,43 @@ public class AuthService : IAuthService
 
     private async Task<Result<TokenResponse>> GenerateTokensForUserAsync(ApplicationUser user, Guid? tenantId)
     {
-        var roles = await _userRepository.GetRolesAsync(user);
-
-        IList<string>? permissions = null;
-        if (_options.UseEnrichedTokens)
+        try
         {
-            var permissionsResult = await _claimsService.GetUserPermissionsAsync(user.Id, tenantId);
-            permissions = permissionsResult.Value;
+            var roles = await _userRepository.GetRolesAsync(user);
+
+            IList<string>? permissions = null;
+            if (_options.UseEnrichedTokens)
+            {
+                var permissionsResult = await _claimsService.GetUserPermissionsAsync(user.Id, tenantId);
+                permissions = permissionsResult.Value;
+            }
+
+            var accessToken = _tokenService.GenerateAccessToken(user, roles, tenantId, permissions);
+            var refreshTokenValue = _tokenService.GenerateRefreshToken();
+
+            var refreshToken = new RefreshToken
+            {
+                Token = refreshTokenValue,
+                UserId = user.Id,
+                ExpiresAt = DateTime.UtcNow.AddDays(_options.RefreshTokenExpirationDays)
+            };
+
+            await _refreshTokenRepository.AddAsync(refreshToken);
+
+            user.LastLoginAt = DateTime.UtcNow;
+            await _userRepository.UpdateAsync(user);
+
+            return Result.Success(new TokenResponse(
+                AccessToken: accessToken,
+                RefreshToken: refreshTokenValue,
+                ExpiresAt: DateTime.UtcNow.AddMinutes(_options.AccessTokenExpirationMinutes)
+            ), "User authenticated successfully.");
         }
-
-        var accessToken = _tokenService.GenerateAccessToken(user, roles, tenantId, permissions);
-        var refreshTokenValue = _tokenService.GenerateRefreshToken();
-
-        var refreshToken = new RefreshToken
+        catch (Exception ex)
         {
-            Token = refreshTokenValue,
-            UserId = user.Id,
-            ExpiresAt = DateTime.UtcNow.AddDays(_options.RefreshTokenExpirationDays)
-        };
 
-        await _refreshTokenRepository.AddAsync(refreshToken);
-
-        user.LastLoginAt = DateTime.UtcNow;
-        await _userRepository.UpdateAsync(user);
-
-        return Result.Success(new TokenResponse(
-            AccessToken: accessToken,
-            RefreshToken: refreshTokenValue,
-            ExpiresAt: DateTime.UtcNow.AddMinutes(_options.AccessTokenExpirationMinutes)
-        ), "User authenticated successfully.");
+            return Result.Failure<TokenResponse>(new Error("500", $"{ex.Message}"));
+        }
     }
 
     public async Task<Result<AuthTokenDto>> AuthenticateWithGoogleAsync(string googleToken, CancellationToken cancellationToken = default)
@@ -291,7 +397,15 @@ public class AuthService : IAuthService
 		RefreshToken = tokenResult.Value.RefreshToken,
 		TokenType = "Bearer",
 		ExpiresIn = _options.AccessTokenExpirationMinutes,
-		User = googleUser.Value
+		User = new UserResponse(
+            user.Id,
+            user.Email ?? string.Empty,
+            user.FirstName,
+            user.LastName,
+            user.IsActive,
+            user.AuthProvider.ToString(),
+            user.GoogleId
+        )
 	};
 }
 
@@ -302,7 +416,7 @@ public class AuthService : IAuthService
 /// <param name="googleUser">The Google user information</param>
 /// <param name="cancellationToken">Cancellation token</param>
 /// <returns>The user entity</returns>
-private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser, CancellationToken cancellationToken)
+private async Task<ApplicationUser> GetOrCreateUserAsync(GoogleUserDto googleUser, CancellationToken cancellationToken)
 {
 	// Try to find user by Google ID first
 	var user = await _userRepository.GetByGoogleIdAsync(googleUser.Id.ToString(), cancellationToken);
@@ -315,8 +429,8 @@ private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser
 		if (user != null)
 		{
 			// Update existing user with Google ID
-			user.GoogleId = googleUser.GoogleId;
-			user.FirstName = googleUser.FirstName ?? user.FirstName;
+			user.GoogleId = googleUser.Id;
+			user.FirstName = googleUser.GivenName ?? user.FirstName;
 			await _userRepository.UpdateAsync(user);
 		}
 		else
@@ -326,9 +440,9 @@ private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser
 			{
 				Email = googleUser.Email,
 				UserName = googleUser.Email,
-				FirstName = googleUser.FirstName ?? string.Empty,
-				LastName = googleUser.LastName ?? string.Empty,
-				GoogleId = googleUser.GoogleId ?? string.Empty,
+				FirstName = googleUser.GivenName ?? string.Empty,
+				LastName = googleUser.FamilyName ?? string.Empty,
+				GoogleId = googleUser.Id,
 				AuthProvider = AuthProvider.Google
 			};
 
@@ -345,7 +459,28 @@ private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser
     /// <param name="googleToken">The Google OAuth token</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Google user information</returns>
-    private async Task<Result<UserResponse>> VerifyGoogleTokenAsync(string googleToken, CancellationToken cancellationToken)
+    public async Task<Result<IntrospectionResponse>> IntrospectAsync(IntrospectionRequest request)
+    {
+        var referenceToken = await _referenceTokenRepository.GetByTokenAsync(request.Token);
+
+        if (referenceToken == null || referenceToken.IsRevoked || referenceToken.ExpiresAt < DateTime.UtcNow)
+        {
+            return Result.Success(new IntrospectionResponse(false), "Token is invalid or expired.");
+        }
+
+        var scopes = JsonSerializer.Deserialize<List<string>>(referenceToken.ClaimsJson) ?? new List<string>();
+
+        var response = new IntrospectionResponse(
+            Active: true,
+            ClientId: referenceToken.Client.ClientId,
+            Scope: scopes,
+            Exp: new DateTimeOffset(referenceToken.ExpiresAt).ToUnixTimeSeconds()
+        );
+
+        return Result.Success(response, "Token is active.");
+    }
+
+    private async Task<Result<GoogleUserDto>> VerifyGoogleTokenAsync(string googleToken, CancellationToken cancellationToken)
     {
         try
         {
@@ -354,9 +489,10 @@ private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var googleUser = JsonSerializer.Deserialize<UserResponse>(json, new JsonSerializerOptions
+            var googleUser = JsonSerializer.Deserialize<GoogleUserDto>(json, new JsonSerializerOptions
             {
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
             });
 
             if (googleUser == null || string.IsNullOrEmpty(googleUser.Email))
@@ -364,11 +500,15 @@ private async Task<ApplicationUser> GetOrCreateUserAsync(UserResponse googleUser
                 throw new UnauthorizedAccessException("Invalid Google token.");
             }
 
-            return googleUser;
+            return Result.Success(googleUser);
         }
         catch (HttpRequestException ex)
         {
-            throw new UnauthorizedAccessException("Failed to verify Google token.", ex);
+            return Result.Failure<GoogleUserDto>(new Error("GoogleAuth.Failed", "Failed to verify Google token."));
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Result.Failure<GoogleUserDto>(new Error("GoogleAuth.InvalidToken", ex.Message));
         }
     }
 }

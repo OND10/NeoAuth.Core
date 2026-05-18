@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using Auth.Domain.Common;
+using Auth.Domain.Entities;
 
 namespace Auth.Application.DTOs;
 
@@ -8,7 +9,9 @@ namespace Auth.Application.DTOs;
 public record LoginRequest(
     [Required] string Email,
     [Required] string Password,
-    Guid? TenantId = null
+    Guid? TenantId = null,
+    DeviceInfo? Device = null,
+    string? IpAddress = null
 );
 
 public record RegisterRequest(
@@ -23,11 +26,21 @@ public record TokenResponse(
     string AccessToken,
     string RefreshToken,
     DateTime ExpiresAt,
-    string TokenType = "Bearer"
+    string TokenType = "Bearer",
+    bool RequiresDeviceVerification = false,
+    string? TemporaryToken = null,
+    Guid? DeviceId = null
 );
 
 public record RefreshTokenRequest(
-    [Required] string RefreshToken
+    [Required] string RefreshToken,
+    string? DeviceFingerprint = null
+);
+
+public record VerifyDeviceRequest(
+    [Required] Guid DeviceId,
+    [Required] string Code,
+    [Required] string TemporaryToken
 );
 
 public record ForgotPasswordRequest(
@@ -79,6 +92,15 @@ public record RotateSecretResponse(
 
 public record UpdateClientScopesRequest(
     [Required] List<Guid> ScopeIds
+);
+public record ClientApplicationResponse(
+    Guid Id,
+    string ClientId,
+    string Name,
+    string? Description,
+    bool IsActive,
+    DateTime CreatedAt,
+    IEnumerable<string> AllowedScopes
 );
 
 // ──────────────────────────── Scope DTOs ────────────────────────────
@@ -229,3 +251,15 @@ public class GoogleAuthRequest
 	/// </summary>
 	public string GoogleToken { get; set; } = string.Empty;
 }
+
+public record IntrospectionRequest(
+    [Required] string Token
+);
+
+public record IntrospectionResponse(
+    bool Active,
+    string? ClientId = null,
+    List<string>? Scope = null,
+    long? Exp = null,
+    string? TokenType = "reference"
+);

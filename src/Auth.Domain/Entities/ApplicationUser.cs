@@ -20,4 +20,5 @@ public class ApplicationUser : IdentityUser<Guid>
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();
     public ICollection<UserPermission> UserPermissions { get; set; } = new List<UserPermission>();
+    public ICollection<UserDevice> Devices { get; set; } = new List<UserDevice>();
 }

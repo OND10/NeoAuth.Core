@@ -1,0 +1,176 @@
+{
+	"info": {
+		"_postman_id": "e4444535-64d1-4475-b6d4-d558b97b0a88",
+		"name": "Auth Module Endpoints",
+		"description": "Collection covering Authentication, Documents, and Device Management.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Login",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"email\": \"user@example.com\",\r\n  \"password\": \"Password123!\",\r\n  \"device\": {\r\n    \"deviceFingerprint\": \"unique-device-hash-123\",\r\n    \"friendlyName\": \"Postman Client\",\r\n    \"platform\": \"Windows\",\r\n    \"deviceType\": \"Desktop\"\r\n  }\r\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/login",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"login"
+							]
+						}
+					}
+				},
+				{
+					"name": "Verify Device (OTP)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n  \"deviceId\": \"guid-returned-from-login\",\r\n  \"code\": \"123456\",\r\n  \"temporaryToken\": \"temp-token-returned-from-login\"\r\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/auth/verify-device",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"verify-device"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Device Management",
+			"item": [
+				{
+					"name": "Get My Devices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/device",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"device"
+							]
+						}
+					}
+				},
+				{
+					"name": "Revoke Device",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/device/{{deviceId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"device",
+								"{{deviceId}}"
+							]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Document Management",
+			"item": [
+				{
+					"name": "Bulk Upload",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{accessToken}}"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "Documents[0].RequiredDocumentId",
+									"value": "guid-here",
+									"type": "text"
+								},
+								{
+									"key": "Documents[0].Files",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/document/bulk-upload",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"document",
+								"bulk-upload"
+							]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "https://localhost:7197"
+		},
+		{
+			"key": "accessToken",
+			"value": ""
+		},
+		{
+			"key": "deviceId",
+			"value": ""
+		}
+	]
+}

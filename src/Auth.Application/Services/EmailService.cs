@@ -30,4 +30,10 @@ public class EmailService : IEmailService
         _logger.LogInformation("Welcome email for {Email}, user {UserName}", toEmail, userName);
         return Task.CompletedTask;
     }
+
+    public Task SendDeviceVerificationEmailAsync(string toEmail, string userName, string code)
+    {
+        _logger.LogInformation("Welcome email for {Email}, user {UserName}", toEmail, userName);
+        return Task.CompletedTask;
+    }
 }

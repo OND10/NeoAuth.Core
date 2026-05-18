@@ -1,11 +1,11 @@
+using Auth.Domain.Common;
+
 namespace Auth.Domain.Entities;
 
-public class Scope
+public class Scope : AuditableEntity
 {
-    public Guid Id { get; set; } = Guid.NewGuid();
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Hierarchical support
     public Guid? ParentId { get; set; }

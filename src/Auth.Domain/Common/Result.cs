@@ -39,7 +39,7 @@ public class Result<T> : Result
 
     public T Value => IsSuccess
         ? _value!
-        : throw new InvalidOperationException("Cannot access value of a failed result.");
+        : default;
 
     public static implicit operator Result<T>(T value) => new(value, true, null);
 }

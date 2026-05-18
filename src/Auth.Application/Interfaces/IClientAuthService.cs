@@ -10,4 +10,5 @@ public interface IClientAuthService
     Task<Result> RevokeClientAsync(Guid id);
     Task<Result<RotateSecretResponse>> RotateSecretAsync(Guid clientId);
     Task<Result> UpdateScopesAsync(Guid clientId, List<Guid> scopeIds);
+    Task<Result<PagedResult<ClientApplicationResponse>>> GetAllAsync(PaginationFilter paginationFilter);
 }

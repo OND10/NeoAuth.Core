@@ -181,10 +181,16 @@ namespace Auth.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -222,6 +228,9 @@ namespace Auth.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -229,6 +238,9 @@ namespace Auth.Infrastructure.Migrations
 
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -249,6 +261,9 @@ namespace Auth.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -258,9 +273,45 @@ namespace Auth.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.ToTable("Products");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.ReferenceToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ClaimsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ClientId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsRevoked")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClientId");
+
+                    b.ToTable("ReferenceTokens");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.RefreshToken", b =>
@@ -290,6 +341,9 @@ namespace Auth.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<Guid?>("UserDeviceId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<Guid?>("UserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -300,9 +354,108 @@ namespace Auth.Infrastructure.Migrations
                     b.HasIndex("Token")
                         .IsUnique();
 
+                    b.HasIndex("UserDeviceId");
+
                     b.HasIndex("UserId");
 
                     b.ToTable("RefreshTokens");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.RequiredDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MetadataSchemaJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("MinFilesRequired")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("RequiresDocumentNumber")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresExpiryDate")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("RequiresIssueDate")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("TargetRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("TriggerRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ValidationRulesJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TargetRoleId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("TriggerRoleId");
+
+                    b.ToTable("RequiredDocuments");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.RoleDeviceLimit", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ApplicationRoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int>("MaxDevices")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("RoleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationRoleId");
+
+                    b.HasIndex("RoleId")
+                        .IsUnique();
+
+                    b.ToTable("RoleDeviceLimits");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.RolePermission", b =>
@@ -333,6 +486,9 @@ namespace Auth.Infrastructure.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -340,6 +496,9 @@ namespace Auth.Infrastructure.Migrations
 
                     b.Property<Guid?>("ParentId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
 
                     b.HasKey("Id");
 
@@ -363,6 +522,12 @@ namespace Auth.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<int?>("MaxDevicesPerUser")
+                        .HasColumnType("int");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -372,6 +537,9 @@ namespace Auth.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("nvarchar(100)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Subdomain")
@@ -379,6 +547,104 @@ namespace Auth.Infrastructure.Migrations
                         .HasFilter("[Subdomain] IS NOT NULL");
 
                     b.ToTable("Tenants");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.UserDevice", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeviceFingerprint")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("DeviceType")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<string>("FriendlyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(45)
+                        .HasColumnType("nvarchar(45)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LastActivityAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Platform")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateTime?>("RevokedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId", "DeviceFingerprint")
+                        .IsUnique()
+                        .HasFilter("[IsDeleted] = 0");
+
+                    b.ToTable("UserDevices");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.UserDocument", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("FileName")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileType")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("FileUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("VerificationRequestId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("VerificationRequestId");
+
+                    b.ToTable("UserDocuments");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.UserPermission", b =>
@@ -415,6 +681,65 @@ namespace Auth.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("UserTenants");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.VerificationRequest", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AdminNotes")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DocumentNumber")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ExpiresAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("IssuedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("MetadataJson")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("RequiredDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ReviewedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<Guid?>("TenantId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RequiredDocumentId");
+
+                    b.HasIndex("TenantId");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("VerificationRequests");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>
@@ -559,12 +884,28 @@ namespace Auth.Infrastructure.Migrations
                     b.Navigation("Parent");
                 });
 
+            modelBuilder.Entity("Auth.Domain.Entities.ReferenceToken", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.ClientApplication", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Client");
+                });
+
             modelBuilder.Entity("Auth.Domain.Entities.RefreshToken", b =>
                 {
                     b.HasOne("Auth.Domain.Entities.ClientApplication", "ClientApplication")
                         .WithMany("RefreshTokens")
                         .HasForeignKey("ClientApplicationId")
                         .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("Auth.Domain.Entities.UserDevice", "Device")
+                        .WithMany("RefreshTokens")
+                        .HasForeignKey("UserDeviceId")
+                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.HasOne("Auth.Domain.Entities.ApplicationUser", "User")
                         .WithMany("RefreshTokens")
@@ -573,7 +914,47 @@ namespace Auth.Infrastructure.Migrations
 
                     b.Navigation("ClientApplication");
 
+                    b.Navigation("Device");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.RequiredDocument", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.ApplicationRole", "TargetRole")
+                        .WithMany()
+                        .HasForeignKey("TargetRoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Auth.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId");
+
+                    b.HasOne("Auth.Domain.Entities.ApplicationRole", "TriggerRole")
+                        .WithMany()
+                        .HasForeignKey("TriggerRoleId");
+
+                    b.Navigation("TargetRole");
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("TriggerRole");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.RoleDeviceLimit", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.ApplicationRole", null)
+                        .WithMany("RoleDeviceLimits")
+                        .HasForeignKey("ApplicationRoleId");
+
+                    b.HasOne("Auth.Domain.Entities.ApplicationRole", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.RolePermission", b =>
@@ -603,6 +984,28 @@ namespace Auth.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("Parent");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.UserDevice", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.ApplicationUser", "User")
+                        .WithMany("Devices")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.UserDocument", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.VerificationRequest", "VerificationRequest")
+                        .WithMany("Documents")
+                        .HasForeignKey("VerificationRequestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("VerificationRequest");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.UserPermission", b =>
@@ -637,6 +1040,32 @@ namespace Auth.Infrastructure.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.VerificationRequest", b =>
+                {
+                    b.HasOne("Auth.Domain.Entities.RequiredDocument", "RequiredDocument")
+                        .WithMany("Requests")
+                        .HasForeignKey("RequiredDocumentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Auth.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Auth.Domain.Entities.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("RequiredDocument");
 
                     b.Navigation("Tenant");
 
@@ -696,11 +1125,15 @@ namespace Auth.Infrastructure.Migrations
 
             modelBuilder.Entity("Auth.Domain.Entities.ApplicationRole", b =>
                 {
+                    b.Navigation("RoleDeviceLimits");
+
                     b.Navigation("RolePermissions");
                 });
 
             modelBuilder.Entity("Auth.Domain.Entities.ApplicationUser", b =>
                 {
+                    b.Navigation("Devices");
+
                     b.Navigation("RefreshTokens");
 
                     b.Navigation("UserPermissions");
@@ -724,6 +1157,11 @@ namespace Auth.Infrastructure.Migrations
                     b.Navigation("UserPermissions");
                 });
 
+            modelBuilder.Entity("Auth.Domain.Entities.RequiredDocument", b =>
+                {
+                    b.Navigation("Requests");
+                });
+
             modelBuilder.Entity("Auth.Domain.Entities.Scope", b =>
                 {
                     b.Navigation("Children");
@@ -736,6 +1174,16 @@ namespace Auth.Infrastructure.Migrations
                     b.Navigation("Roles");
 
                     b.Navigation("UserTenants");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.UserDevice", b =>
+                {
+                    b.Navigation("RefreshTokens");
+                });
+
+            modelBuilder.Entity("Auth.Domain.Entities.VerificationRequest", b =>
+                {
+                    b.Navigation("Documents");
                 });
 #pragma warning restore 612, 618
         }

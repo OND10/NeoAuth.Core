@@ -99,6 +99,14 @@ public class TokenService : ITokenService
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
+    public string GenerateReferenceToken()
+    {
+        var randomBytes = new byte[32];
+        using var rng = RandomNumberGenerator.Create();
+        rng.GetBytes(randomBytes);
+        return "ref_" + Convert.ToHexString(randomBytes).ToLower();
+    }
+
     public string GenerateRefreshToken()
     {
         var randomBytes = new byte[64];
@@ -131,5 +139,40 @@ public class TokenService : ITokenService
         {
             return null;
         }
+    }
+
+    public string GenerateTemporaryDeviceVerificationToken(ApplicationUser user, Guid deviceId)
+    {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new("device_id", deviceId.ToString()),
+            new("token_type", "device_verification"),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
+
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_options.JwtSecret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: _options.JwtIssuer,
+            audience: _options.JwtAudience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(15), // Short expiration for OTP
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public ClaimsPrincipal? ValidateTemporaryDeviceVerificationToken(string token)
+    {
+        var principal = ValidateToken(token);
+        if (principal == null) return null;
+
+        var tokenType = principal.FindFirst("token_type")?.Value;
+        if (tokenType != "device_verification") return null;
+
+        return principal;
     }
 }

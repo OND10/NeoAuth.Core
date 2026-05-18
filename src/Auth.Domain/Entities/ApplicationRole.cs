@@ -11,4 +11,6 @@ public class ApplicationRole : IdentityRole<Guid>
     // Navigation properties
     public Tenant? Tenant { get; set; }
     public ICollection<RolePermission> RolePermissions { get; set; } = new List<RolePermission>();
+    public ICollection<RoleDeviceLimit> RoleDeviceLimits{ get; set; } = new List<RoleDeviceLimit>();
+
 }

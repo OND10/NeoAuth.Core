@@ -5,6 +5,7 @@ using Auth.Application.Configuration;
 using Auth.Infrastructure.Data;
 using Auth.Infrastructure.Repositories;
 using Auth.Application.Services;
+using Auth.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -74,6 +75,20 @@ public static class AuthModuleExtensions
                 ValidateLifetime = true,
                 ClockSkew = TimeSpan.Zero
             };
+
+            options.Events = new JwtBearerEvents
+            {
+                OnMessageReceived = context =>
+                {
+                    var authHeader = context.Request.Headers["Authorization"].FirstOrDefault();
+                    if (authHeader != null && authHeader.StartsWith("Bearer ref_", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Skip JWT validation for reference tokens
+                        context.NoResult();
+                    }
+                    return Task.CompletedTask;
+                }
+            };
         });
 
         // ──── Google OAuth (if configured) ────
@@ -98,10 +113,14 @@ public static class AuthModuleExtensions
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+        services.AddScoped<IReferenceTokenRepository, ReferenceTokenRepository>();
         services.AddScoped<IClientRepository, ClientRepository>();
-        services.AddScoped<ITenantRepository, TenantRepository>();
+        services.AddScoped<IDocumentRepository, DocumentRepository>();
         services.AddScoped<IPermissionRepository, PermissionRepository>();
+        services.AddScoped<ITenantRepository, TenantRepository>();
         services.AddScoped<IScopeRepository, ScopeRepository>();
+        services.AddScoped<IDeviceRepository, DeviceRepository>();
+        
 
         // ──── Services ────
         services.AddScoped<ITokenService, TokenService>();
@@ -113,6 +132,9 @@ public static class AuthModuleExtensions
         services.AddScoped<IEmailService, EmailService>();
         services.AddScoped<IScopeService, ScopeService>();
         services.AddScoped<IUserService, UserService>();
+        services.AddScoped<IDocumentService, DocumentService>();
+        services.AddScoped<IFileService, LocalFileService>();
+        services.AddScoped<IDeviceService, DeviceService>();
 
         return services;
     }
