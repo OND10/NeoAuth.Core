@@ -37,6 +37,14 @@ public class DocumentRepository : IDocumentRepository
             .Where(rd => rd.TenantId == tenantId)
             .ToListAsync();
     }
+    
+    public async Task<IEnumerable<RequiredDocument>> GetRequiredDocuments()
+    {
+        return await _context.RequiredDocuments
+            .Include(rd => rd.TargetRole)
+            .Include(rd => rd.TriggerRole)
+            .ToListAsync();
+    }
 
     public async Task<RequiredDocument?> GetRequiredDocumentByIdAsync(Guid id)
     {

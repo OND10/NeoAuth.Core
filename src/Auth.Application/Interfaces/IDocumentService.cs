@@ -8,6 +8,7 @@ public interface IDocumentService
     // Required Documents (Admin & User)
     Task<Result<IEnumerable<RequiredDocumentDto>>> GetRequiredDocumentsAsync(IEnumerable<string> roleNames);
     Task<Result<IEnumerable<RequiredDocumentDto>>> GetTenantRequiredDocumentsAsync();
+    Task<Result<IEnumerable<RequiredDocumentDto>>> GetRequiredDocumentsAsync();
     Task<Result<RequiredDocumentDto>> CreateRequiredDocumentAsync(ConfigureRequiredDocumentRequest request);
     Task<Result> UpdateRequiredDocumentAsync(Guid id, ConfigureRequiredDocumentRequest request);
     Task<Result> DeleteRequiredDocumentAsync(Guid id);

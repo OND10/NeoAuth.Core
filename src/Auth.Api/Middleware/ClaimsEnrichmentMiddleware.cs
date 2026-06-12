@@ -60,10 +60,10 @@ public class ClaimsEnrichmentMiddleware
 
         var permissionsResult = await claimsService.GetUserPermissionsAsync(userGuid, tenantId);
 
-        if (permissionsResult.IsSuccess && permissionsResult.Value.Any())
+        if (permissionsResult.IsSuccess && permissionsResult.Data.Any())
         {
             var identity = new ClaimsIdentity("PermissionsEnrichment");
-            foreach (var permission in permissionsResult.Value)
+            foreach (var permission in permissionsResult.Data)
             {
                 identity.AddClaim(new Claim("permission", permission));
             }
@@ -85,10 +85,10 @@ public class ClaimsEnrichmentMiddleware
 
         var scopesResult = await claimsService.GetClientScopesAsync(clientId);
 
-        if (scopesResult.IsSuccess && scopesResult.Value.Any())
+        if (scopesResult.IsSuccess && scopesResult.Data.Any())
         {
             var identity = new ClaimsIdentity("ScopesEnrichment");
-            foreach (var scope in scopesResult.Value)
+            foreach (var scope in scopesResult.Data)
             {
                 identity.AddClaim(new Claim("scope", scope));
             }

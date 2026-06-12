@@ -35,7 +35,6 @@ public class AuthServiceTests
         _emailServiceMock = new Mock<IEmailService>();
         _httpClientFactoryMock = new Mock<System.Net.Http.IHttpClientFactory>();
         _claimsServiceMock = new Mock<IClaimsService>();
-        _claimsServiceMock = new Mock<IClaimsService>();
         _clientRepositoryMock = new Mock<IClientRepository>();
         var _deviceServiceMock = new Mock<IDeviceService>();
         
@@ -71,5 +70,93 @@ public class AuthServiceTests
         // Assert
         result.IsFailure.Should().BeTrue();
         result.Error.Should().Be(Error.InvalidCredentials);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithClientReferenceToken_ShouldGenerateNewReferenceToken()
+    {
+        // Arrange
+        var clientApp = new ClientApplication
+        {
+            Id = Guid.NewGuid(),
+            ClientId = "client-id",
+            IsActive = true
+        };
+
+        var storedToken = new RefreshToken
+        {
+            Token = "ref_client-refresh-token",
+            ClientApplicationId = clientApp.Id,
+            ClientApplication = clientApp,
+            ExpiresAt = DateTime.UtcNow.AddDays(1)
+        };
+
+        _refreshRepoMock.Setup(x => x.GetByTokenAsync("ref_client-refresh-token"))
+            .ReturnsAsync(storedToken);
+
+        _tokenServiceMock.Setup(x => x.GenerateRefreshToken("ref_"))
+            .Returns("ref_new-client-refresh-token");
+
+        _tokenServiceMock.Setup(x => x.GenerateReferenceToken())
+            .Returns("ref_new-client-access-token");
+
+        var request = new RefreshTokenRequest("ref_client-refresh-token");
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Data.AccessToken.Should().Be("ref_new-client-access-token");
+        result.Data.RefreshToken.Should().Be("ref_new-client-refresh-token");
+        
+        storedToken.RevokedAt.Should().NotBeNull();
+        storedToken.ReplacedByToken.Should().Be("ref_new-client-refresh-token");
+        _refreshRepoMock.Verify(x => x.AddAsync(It.Is<RefreshToken>(rt => rt.Token == "ref_new-client-refresh-token" && rt.ClientApplicationId == clientApp.Id)), Times.Once);
+        _referenceTokenRepoMock.Verify(x => x.AddAsync(It.Is<ReferenceToken>(rt => rt.Token == "ref_new-client-access-token" && rt.ClientId == clientApp.Id)), Times.Once);
+    }
+
+    [Fact]
+    public async Task RefreshTokenAsync_WithClientJwtToken_ShouldGenerateNewJwtToken()
+    {
+        // Arrange
+        var clientApp = new ClientApplication
+        {
+            Id = Guid.NewGuid(),
+            ClientId = "client-id",
+            IsActive = true
+        };
+
+        var storedToken = new RefreshToken
+        {
+            Token = "jwt_client-refresh-token",
+            ClientApplicationId = clientApp.Id,
+            ClientApplication = clientApp,
+            ExpiresAt = DateTime.UtcNow.AddDays(1)
+        };
+
+        _refreshRepoMock.Setup(x => x.GetByTokenAsync("jwt_client-refresh-token"))
+            .ReturnsAsync(storedToken);
+
+        _tokenServiceMock.Setup(x => x.GenerateRefreshToken("jwt_"))
+            .Returns("jwt_new-client-refresh-token");
+
+        _tokenServiceMock.Setup(x => x.GenerateClientAccessToken(clientApp, It.IsAny<IEnumerable<string>>()))
+            .Returns("jwt_new-client-access-token");
+
+        var request = new RefreshTokenRequest("jwt_client-refresh-token");
+
+        // Act
+        var result = await _authService.RefreshTokenAsync(request);
+
+        // Assert
+        result.IsSuccess.Should().BeTrue();
+        result.Data.AccessToken.Should().Be("jwt_new-client-access-token");
+        result.Data.RefreshToken.Should().Be("jwt_new-client-refresh-token");
+        
+        storedToken.RevokedAt.Should().NotBeNull();
+        storedToken.ReplacedByToken.Should().Be("jwt_new-client-refresh-token");
+        _refreshRepoMock.Verify(x => x.AddAsync(It.Is<RefreshToken>(rt => rt.Token == "jwt_new-client-refresh-token" && rt.ClientApplicationId == clientApp.Id)), Times.Once);
+        _referenceTokenRepoMock.Verify(x => x.AddAsync(It.IsAny<ReferenceToken>()), Times.Never);
     }
 }

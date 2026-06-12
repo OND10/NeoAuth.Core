@@ -34,7 +34,7 @@ public record UserDocumentDto(
 
 public record CreateVerificationRequest(
     Guid RequiredDocumentId,
-    IEnumerable<IFormFile> Files,
+    IFormFileCollection Files,
     string? DocumentNumber = null,
     DateTime? IssuedAt = null,
     DateTime? ExpiresAt = null,
@@ -47,7 +47,7 @@ public record BulkVerificationRequest(
 
 public record DocumentUploadItem(
     Guid RequiredDocumentId,
-    IEnumerable<IFormFile> Files,
+    IFormFileCollection Files,
     string? DocumentNumber = null,
     DateTime? IssuedAt = null,
     DateTime? ExpiresAt = null,
@@ -88,7 +88,8 @@ public record ConfigureRequiredDocumentRequest(
     bool RequiresDocumentNumber = false,
     bool RequiresIssueDate = false,
     bool RequiresExpiryDate = false,
-    string? MetadataSchemaJson = null
+    string? MetadataSchemaJson = null,
+    string? ValidationRulesJson = null
 );
 
 public record RequiredDocumentDto(
@@ -102,5 +103,17 @@ public record RequiredDocumentDto(
     bool RequiresDocumentNumber = false,
     bool RequiresIssueDate = false,
     bool RequiresExpiryDate = false,
-    string? MetadataSchemaJson = null
+    string? MetadataSchemaJson = null,
+    string? ValidationRulesJson = null
 );
+
+public class DocumentValidationRules
+{
+    public int? DocumentNumberMinLength { get; set; }
+    public int? DocumentNumberMaxLength { get; set; }
+    public string? DocumentNumberRegex { get; set; }
+    public int? MinDurationDays { get; set; }
+    public int? MaxDurationDays { get; set; }
+    public int? MinDurationYears { get; set; }
+    public int? MaxDurationYears { get; set; }
+}

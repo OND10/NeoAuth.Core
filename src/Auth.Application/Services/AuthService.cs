@@ -70,7 +70,7 @@ public class AuthService : IAuthService
         if (_options.UseEnrichedTokens)
         {
             var scopesResult = await _claimsService.GetClientScopesAsync(client.ClientId);
-            scopes = scopesResult.Value;
+            scopes = scopesResult.Data;
         }
         else
         {
@@ -78,7 +78,7 @@ public class AuthService : IAuthService
         }
 
         var token = _tokenService.GenerateReferenceToken();
-        var refreshTokenValue = _tokenService.GenerateRefreshToken();
+        var refreshTokenValue = _tokenService.GenerateRefreshToken("ref_");
 
         // Store Reference Token
         var referenceToken = new ReferenceToken
@@ -135,7 +135,7 @@ public class AuthService : IAuthService
                 return Result.Failure<TokenResponse>(deviceResult.Error);
             }
 
-            var device = deviceResult.Value;
+            var device = deviceResult.Data;
 
             if (device.Status == DeviceStatus.PendingVerification)
             {
@@ -247,6 +247,63 @@ public class AuthService : IAuthService
         // Revoke the old token (rotation)
         storedToken.RevokedAt = DateTime.UtcNow;
 
+        if (storedToken.ClientApplicationId.HasValue)
+        {
+            var client = storedToken.ClientApplication;
+            if (client is null || !client.IsActive)
+                return Result.Failure<TokenResponse>(Error.ClientInactive);
+
+            var isReferenceToken = storedToken.Token.StartsWith("ref_");
+            var prefix = isReferenceToken ? "ref_" : "jwt_";
+            var newRefreshTokenValue = _tokenService.GenerateRefreshToken(prefix);
+            
+            storedToken.ReplacedByToken = newRefreshTokenValue;
+            await _refreshTokenRepository.UpdateAsync(storedToken);
+
+            var newRefreshToken = new RefreshToken
+            {
+                Token = newRefreshTokenValue,
+                ClientApplicationId = client.Id,
+                ExpiresAt = DateTime.UtcNow.AddDays(7)
+            };
+            await _refreshTokenRepository.AddAsync(newRefreshToken);
+
+            IList<string>? scopes = null;
+            if (_options.UseEnrichedTokens)
+            {
+                var scopesResult = await _claimsService.GetClientScopesAsync(client.ClientId);
+                scopes = scopesResult.Data;
+            }
+            else
+            {
+                scopes = client.AllowedScopes.Select(s => s.Scope.Name).ToList();
+            }
+
+            string newAccessToken;
+            if (isReferenceToken)
+            {
+                newAccessToken = _tokenService.GenerateReferenceToken();
+                var referenceToken = new ReferenceToken
+                {
+                    Token = newAccessToken,
+                    ClientId = client.Id,
+                    ClaimsJson = System.Text.Json.JsonSerializer.Serialize(scopes),
+                    ExpiresAt = DateTime.UtcNow.AddMinutes(_options.ClientTokenExpirationMinutes)
+                };
+                await _referenceTokenRepository.AddAsync(referenceToken);
+            }
+            else
+            {
+                newAccessToken = _tokenService.GenerateClientAccessToken(client, scopes);
+            }
+
+            return Result.Success(new TokenResponse(
+                AccessToken: newAccessToken,
+                RefreshToken: newRefreshTokenValue,
+                ExpiresAt: DateTime.UtcNow.AddMinutes(_options.ClientTokenExpirationMinutes)
+            ), "Client token refreshed successfully.");
+        }
+
         var user = storedToken.User;
         if (user is null || !user.IsActive)
             return Result.Failure<TokenResponse>(Error.UserInactive);
@@ -345,7 +402,7 @@ public class AuthService : IAuthService
             if (_options.UseEnrichedTokens)
             {
                 var permissionsResult = await _claimsService.GetUserPermissionsAsync(user.Id, tenantId);
-                permissions = permissionsResult.Value;
+                permissions = permissionsResult.Data;
             }
 
             var accessToken = _tokenService.GenerateAccessToken(user, roles, tenantId, permissions);
@@ -382,7 +439,7 @@ public class AuthService : IAuthService
 	var googleUser = await VerifyGoogleTokenAsync(googleToken, cancellationToken);
 
 	// Find or create user
-	var user = await GetOrCreateUserAsync(googleUser.Value, cancellationToken);
+	var user = await GetOrCreateUserAsync(googleUser.Data, cancellationToken);
 
 	// Update last active time
 	await _userRepository.UpdateLastActiveAsync(user.Id);
@@ -393,8 +450,8 @@ public class AuthService : IAuthService
 
 	return new AuthTokenDto
 	{
-		AccessToken = tokenResult.Value.AccessToken,
-		RefreshToken = tokenResult.Value.RefreshToken,
+		AccessToken = tokenResult.Data.AccessToken,
+		RefreshToken = tokenResult.Data.RefreshToken,                      
 		TokenType = "Bearer",
 		ExpiresIn = _options.AccessTokenExpirationMinutes,
 		User = new UserResponse(

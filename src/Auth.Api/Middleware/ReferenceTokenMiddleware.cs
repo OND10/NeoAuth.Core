@@ -24,17 +24,17 @@ public class ReferenceTokenMiddleware
             
             var result = await authService.IntrospectAsync(new IntrospectionRequest(token));
 
-            if (result.IsSuccess && result.Value.Active)
+            if (result.IsSuccess && result.Data.Active)
             {
                 var claims = new List<Claim>
                 {
-                    new("client_id", result.Value.ClientId ?? string.Empty),
+                    new("client_id", result.Data.ClientId ?? string.Empty),
                     new("token_type", "client")
                 };
 
-                if (result.Value.Scope != null)
+                if (result.Data.Scope != null)
                 {
-                    foreach (var scope in result.Value.Scope)
+                    foreach (var scope in result.Data.Scope)
                     {
                         claims.Add(new Claim("scope", scope));
                     }

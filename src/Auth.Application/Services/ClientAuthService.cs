@@ -12,13 +12,16 @@ public class ClientAuthService : IClientAuthService
 {
     private readonly IClientRepository _clientRepository;
     private readonly ITokenService _tokenService;
+    private readonly IRefreshTokenRepository _refreshTokenRepository;
 
     public ClientAuthService(
         IClientRepository clientRepository,
-        ITokenService tokenService)
+        ITokenService tokenService,
+        IRefreshTokenRepository refreshTokenRepository)
     {
         _clientRepository = clientRepository;
         _tokenService = tokenService;
+        _refreshTokenRepository = refreshTokenRepository;
     }
 
     public async Task<Result<ClientCredentialsResponse>> AuthenticateAsync(ClientCredentialsRequest request)
@@ -39,7 +42,7 @@ public class ClientAuthService : IClientAuthService
         var scopes = client.AllowedScopes.Select(s => s.Scope.Name).ToList();
         var token = _tokenService.GenerateClientAccessToken(client, scopes);
 
-        var refreshTokenValue = _tokenService.GenerateRefreshToken();
+        var refreshTokenValue = _tokenService.GenerateRefreshToken("jwt_");
         var refreshToken = new RefreshToken
         {
             Token = refreshTokenValue,
@@ -47,8 +50,7 @@ public class ClientAuthService : IClientAuthService
             ExpiresAt = DateTime.UtcNow.AddDays(7) // Hardcoded for now, or use options
         };
 
-        // Note: ClientAuthService might not have IRefreshTokenRepository injected. 
-        // I should check or just use AuthService.
+        await _refreshTokenRepository.AddAsync(refreshToken);
         
         return Result.Success(new ClientCredentialsResponse(
             AccessToken: token,

@@ -80,11 +80,11 @@ public class AuthController : ControllerBase
         var result = await _authService.RegisterAsync(request);
         if (result.IsFailure) return BadRequest(result);
 
-        var token = await _userService.GenerateUserEmailConfirmationTokenAsync(result.Value);
+        var token = await _userService.GenerateUserEmailConfirmationTokenAsync(result.Data);
         var callbackUrl = Url.Action(
                             action: "ConfirmEmail",
                             controller: "Auth",
-                            values: new { userId = result.Value.Id, code = token },
+                            values: new { userId = result.Data.Id, code = token },
                             protocol: "https"
         );
 
@@ -162,7 +162,7 @@ public class AuthController : ControllerBase
 
         // In a real application, you might want to set secure HTTP-only cookies
         // or redirect to a frontend page that handles the tokens
-        return Redirect($"{_options.Value.FrontendUrl}?access_token={authResult.Value.AccessToken}&refresh_token={authResult.Value.RefreshToken}");
+        return Redirect($"{_options.Value.FrontendUrl}?access_token={authResult.Data.AccessToken}&refresh_token={authResult.Data.RefreshToken}");
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public class AuthController : ControllerBase
             var user = await _userService.FindUserByIdAsync(userId);
             if (user.IsFailure) return Unauthorized(new { user.Error!.Code, user.Error.Message });
 
-            var result = await _userService.ConfirmUserEmailAsync(user.Value, code);
+            var result = await _userService.ConfirmUserEmailAsync(user.Data, code);
             if (result.IsSuccess)
                 return Ok(new { Message = "Email confirmed successfully." });
         }

@@ -21,7 +21,7 @@ public class TenantController : ControllerBase
     public async Task<IActionResult> GetAll()
     {
         var result = await _tenantService.GetAllAsync();
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpGet("{id:guid}")]
@@ -29,7 +29,7 @@ public class TenantController : ControllerBase
     {
         var result = await _tenantService.GetByIdAsync(id);
         if (result.IsFailure) return NotFound(new { result.Error!.Code, result.Error.Message });
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpPost]
@@ -37,7 +37,7 @@ public class TenantController : ControllerBase
     {
         var result = await _tenantService.CreateAsync(request);
         if (result.IsFailure) return BadRequest(new { result.Error!.Code, result.Error.Message });
-        return CreatedAtAction(nameof(GetById), new { id = result.Value.Id }, result.Value);
+        return CreatedAtAction(nameof(GetById), new { id = result.Data.Id }, result.Data);
     }
 
     [HttpPost("{tenantId:guid}/users")]
@@ -60,6 +60,6 @@ public class TenantController : ControllerBase
     public async Task<IActionResult> GetUserTenants(Guid userId)
     {
         var result = await _tenantService.GetUserTenantsAsync(userId);
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 }

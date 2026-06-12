@@ -22,7 +22,7 @@ public class ScopeController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] PaginationFilter filter)
     {
         var result = await _scopeService.GetAllAsync(filter);
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpGet("{id:guid}")]
@@ -30,7 +30,7 @@ public class ScopeController : ControllerBase
     {
         var result = await _scopeService.GetByIdAsync(id);
         if (result.IsFailure) return NotFound(new { result.Error!.Code, result.Error.Message });
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpPost]
@@ -38,7 +38,7 @@ public class ScopeController : ControllerBase
     {
         var result = await _scopeService.CreateAsync(request);
         if (result.IsFailure) return BadRequest(new { result.Error!.Code, result.Error.Message });
-        return CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value);
+        return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result.Data);
     }
 
     [HttpPut("{id:guid}")]

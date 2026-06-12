@@ -16,6 +16,12 @@ public class ApplicationUser : IdentityUser<Guid>
 	/// </summary>
 	public string? GoogleId { get; set; }
 
+    /// <summary>
+    /// Optional user-specific limit override for maximum active devices.
+    /// If null, falls back to role limits, tenant limits, or global defaults.
+    /// </summary>
+    public int? MaxDevicesLimit { get; set; }
+
     // Navigation properties
     public ICollection<RefreshToken> RefreshTokens { get; set; } = new List<RefreshToken>();
     public ICollection<UserTenant> UserTenants { get; set; } = new List<UserTenant>();

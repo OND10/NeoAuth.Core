@@ -8,6 +8,7 @@ public interface IDocumentRepository
     Task<IEnumerable<RequiredDocument>> GetRequiredDocumentsByRolesAsync(IEnumerable<string> roleNames, Guid tenantId);
     Task<IEnumerable<RequiredDocument>> GetRequiredDocumentsForTenantAsync(Guid tenantId);
     Task<RequiredDocument?> GetRequiredDocumentByIdAsync(Guid id);
+    Task<IEnumerable<RequiredDocument>> GetRequiredDocuments();
     Task AddRequiredDocumentAsync(RequiredDocument doc);
     Task UpdateRequiredDocumentAsync(RequiredDocument doc);
     Task DeleteRequiredDocumentAsync(Guid id);

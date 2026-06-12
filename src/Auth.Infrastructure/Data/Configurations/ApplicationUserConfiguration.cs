@@ -11,5 +11,6 @@ public class ApplicationUserConfiguration : IEntityTypeConfiguration<Application
         builder.Property(u => u.FirstName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.LastName).HasMaxLength(100).IsRequired();
         builder.Property(u => u.AuthProvider).HasConversion<string>().HasMaxLength(20);
+        builder.Property(u => u.MaxDevicesLimit).IsRequired(false);
     }
 }

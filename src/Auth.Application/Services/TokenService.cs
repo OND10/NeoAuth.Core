@@ -107,12 +107,13 @@ public class TokenService : ITokenService
         return "ref_" + Convert.ToHexString(randomBytes).ToLower();
     }
 
-    public string GenerateRefreshToken()
+    public string GenerateRefreshToken(string prefix = "")
     {
         var randomBytes = new byte[64];
         using var rng = RandomNumberGenerator.Create();
         rng.GetBytes(randomBytes);
-        return Convert.ToBase64String(randomBytes);
+        var token = Convert.ToBase64String(randomBytes);
+        return string.IsNullOrEmpty(prefix) ? token : $"{prefix}{token}";
     }
 
     public ClaimsPrincipal? ValidateToken(string token)

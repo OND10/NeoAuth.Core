@@ -29,16 +29,16 @@ public class Result
 
 public class Result<T> : Result
 {
-    private readonly T? _value;
+    private readonly T? _data;
 
-    internal Result(T? value, bool isSuccess, Error? error)
+    internal Result(T? data, bool isSuccess, Error? error)
         : base(isSuccess, error)
     {
-        _value = value;
+        _data = data;
     }
 
-    public T Value => IsSuccess
-        ? _value!
+    public T Data => IsSuccess
+        ? _data!
         : default;
 
     public static implicit operator Result<T>(T value) => new(value, true, null);

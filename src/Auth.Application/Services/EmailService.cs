@@ -31,9 +31,9 @@ public class EmailService : IEmailService
         return Task.CompletedTask;
     }
 
-    public Task SendDeviceVerificationEmailAsync(string toEmail, string userName, string code)
+    public Task SendDeviceVerificationEmailAsync(string toEmail, string deviceName, string code)
     {
-        _logger.LogInformation("Welcome email for {Email}, user {UserName}", toEmail, userName);
+        _logger.LogInformation("Device verification for {Email}. Device: {DeviceName}. Code: {Code}", toEmail, deviceName, code);
         return Task.CompletedTask;
     }
 }

@@ -42,7 +42,7 @@ public class DocumentService : IDocumentService
 
         var response = docs.Select(x => new RequiredDocumentDto(
             x.Id, x.Name, x.Description, x.MinFilesRequired, x.TargetRoleId, x.TriggerRoleId, x.IsActive,
-            x.RequiresDocumentNumber, x.RequiresIssueDate, x.RequiresExpiryDate, x.MetadataSchemaJson));
+            x.RequiresDocumentNumber, x.RequiresIssueDate, x.RequiresExpiryDate, x.MetadataSchemaJson, x.ValidationRulesJson));
 
         return Result.Success(response);
     }
@@ -54,36 +54,56 @@ public class DocumentService : IDocumentService
 
         var response = docs.Select(x => new RequiredDocumentDto(
             x.Id, x.Name, x.Description, x.MinFilesRequired, x.TargetRoleId, x.TriggerRoleId, x.IsActive,
-            x.RequiresDocumentNumber, x.RequiresIssueDate, x.RequiresExpiryDate, x.MetadataSchemaJson));
+            x.RequiresDocumentNumber, x.RequiresIssueDate, x.RequiresExpiryDate, x.MetadataSchemaJson, x.ValidationRulesJson));
+
+        return Result.Success(response);
+    }
+    
+    public async Task<Result<IEnumerable<RequiredDocumentDto>>> GetRequiredDocumentsAsync()
+    {
+        var docs = await _documentRepository.GetRequiredDocuments();
+
+        var response = docs.Select(x => new RequiredDocumentDto(
+            x.Id, x.Name, x.Description, x.MinFilesRequired, x.TargetRoleId, x.TriggerRoleId, x.IsActive,
+            x.RequiresDocumentNumber, x.RequiresIssueDate, x.RequiresExpiryDate, x.MetadataSchemaJson, x.ValidationRulesJson));
 
         return Result.Success(response);
     }
 
     public async Task<Result<RequiredDocumentDto>> CreateRequiredDocumentAsync(ConfigureRequiredDocumentRequest request)
     {
-        var tenantId = _tenantContext.TenantId;
-
-        var doc = new RequiredDocument
+        try
         {
-            Name = request.Name,
-            Description = request.Description,
-            MinFilesRequired = request.MinFilesRequired,
-            TargetRoleId = request.TargetRoleId,
-            TriggerRoleId = request.TriggerRoleId,
-            TenantId = tenantId,
-            IsActive = request.IsActive,
-            RequiresDocumentNumber = request.RequiresDocumentNumber,
-            RequiresIssueDate = request.RequiresIssueDate,
-            RequiresExpiryDate = request.RequiresExpiryDate,
-            MetadataSchemaJson = request.MetadataSchemaJson
-        };
+            var tenantId = _tenantContext.TenantId;
 
-        await _documentRepository.AddRequiredDocumentAsync(doc);
-        await _documentRepository.SaveChangesAsync();
+            var doc = new RequiredDocument
+            {
+                Name = request.Name,
+                Description = request.Description,
+                MinFilesRequired = request.MinFilesRequired,
+                TargetRoleId = request.TargetRoleId,
+                TriggerRoleId = request.TriggerRoleId,
+                TenantId =  null,
+                IsActive = request.IsActive,
+                RequiresDocumentNumber = request.RequiresDocumentNumber,
+                RequiresIssueDate = request.RequiresIssueDate,
+                RequiresExpiryDate = request.RequiresExpiryDate,
+                MetadataSchemaJson = request.MetadataSchemaJson,
+                ValidationRulesJson = request.ValidationRulesJson
+            };
 
-        return Result.Success(new RequiredDocumentDto(
-            doc.Id, doc.Name, doc.Description, doc.MinFilesRequired, doc.TargetRoleId, doc.TriggerRoleId, doc.IsActive,
-            doc.RequiresDocumentNumber, doc.RequiresIssueDate, doc.RequiresExpiryDate, doc.MetadataSchemaJson));
+            await _documentRepository.AddRequiredDocumentAsync(doc);
+            await _documentRepository.SaveChangesAsync();
+
+            return Result.Success(new RequiredDocumentDto(
+                doc.Id, doc.Name, doc.Description, doc.MinFilesRequired, doc.TargetRoleId, doc.TriggerRoleId, doc.IsActive,
+                doc.RequiresDocumentNumber, doc.RequiresIssueDate, doc.RequiresExpiryDate, doc.MetadataSchemaJson, doc.ValidationRulesJson));
+        }
+        catch (Exception ex)
+        {
+
+            throw ex;
+        }
     }
 
     public async Task<Result> UpdateRequiredDocumentAsync(Guid id, ConfigureRequiredDocumentRequest request)
@@ -101,6 +121,7 @@ public class DocumentService : IDocumentService
         doc.RequiresIssueDate = request.RequiresIssueDate;
         doc.RequiresExpiryDate = request.RequiresExpiryDate;
         doc.MetadataSchemaJson = request.MetadataSchemaJson;
+        doc.ValidationRulesJson = request.ValidationRulesJson;
 
         await _documentRepository.UpdateRequiredDocumentAsync(doc);
         await _documentRepository.SaveChangesAsync();
@@ -122,17 +143,11 @@ public class DocumentService : IDocumentService
         if (!requiredDoc.IsActive)
             return Result.Failure<Guid>(Error.Validation("Document.Inactive", "This document requirement is no longer active."));
 
-        // Basic Metadata Validation
-        if (requiredDoc.RequiresDocumentNumber && string.IsNullOrWhiteSpace(request.DocumentNumber))
-            return Result.Failure<Guid>(Error.Validation("Metadata.MissingNumber", "Document number is required."));
 
-        if (requiredDoc.RequiresIssueDate && !request.IssuedAt.HasValue)
-            return Result.Failure<Guid>(Error.Validation("Metadata.MissingIssueDate", "Issue date is required."));
-
-        if (requiredDoc.RequiresExpiryDate && !request.ExpiresAt.HasValue)
-            return Result.Failure<Guid>(Error.Validation("Metadata.MissingExpiryDate", "Expiry date is required."));
-
-        if (request.Files == null || request.Files.Count() < requiredDoc.MinFilesRequired)
+        var validationResult = ValidateDocumentMetadata(requiredDoc, request.DocumentNumber, request.IssuedAt, request.ExpiresAt);
+        if (!validationResult.IsSuccess)
+            return Result.Failure<Guid>(validationResult.Error);
+        if (request.Files == null || request.Files.Count() < requiredDoc.MinFilesRequired)
             return Result.Failure<Guid>(Error.Validation("Document.InsufficientFiles", $"At least {requiredDoc.MinFilesRequired} files are required."));
 
         var verificationRequest = new VerificationRequest
@@ -172,10 +187,17 @@ public class DocumentService : IDocumentService
 
             // ── Validate all file types up-front before touching the DB ──────────────
             foreach (var doc in request.Documents)
-                foreach (var file in doc.Files ?? [])
-                    if (!ImageValidation.ValidationFileUpload(file))
-                        return Result.Failure(Error.Validation("File.Invalid",
-                            $"File '{file.FileName}' is invalid or exceeds the allowed size."));
+            {
+                if (doc.Files != null)
+                {
+                    foreach (var file in doc.Files)
+                    {
+                        if (!ImageValidation.ValidationFileUpload(file))
+                            return Result.Failure(Error.Validation("File.Invalid",
+                                $"File '{file.FileName}' is invalid or exceeds the allowed size."));
+                    }
+                }
+            }
 
             // ── Process each document item ────────────────────────────────────────────
             foreach (var item in request.Documents)
@@ -196,20 +218,13 @@ public class DocumentService : IDocumentService
                         $"'{requiredDoc.Name}' requires at least {requiredDoc.MinFilesRequired} file(s), " +
                         $"but {fileCount} were uploaded."));
 
-                if (requiredDoc.RequiresDocumentNumber && string.IsNullOrWhiteSpace(item.DocumentNumber))
-                    return Result.Failure(Error.Validation("Metadata.MissingNumber",
-                        $"Document number is required for '{requiredDoc.Name}'."));
+                var validationResult = ValidateDocumentMetadata(requiredDoc, item.DocumentNumber, item.IssuedAt, item.ExpiresAt);
+                if (!validationResult.IsSuccess)
+                    return Result.Failure(validationResult.Error);
 
-                if (requiredDoc.RequiresIssueDate && !item.IssuedAt.HasValue)
-                    return Result.Failure(Error.Validation("Metadata.MissingIssueDate",
-                        $"Issue date is required for '{requiredDoc.Name}'."));
-
-                if (requiredDoc.RequiresExpiryDate && !item.ExpiresAt.HasValue)
-                    return Result.Failure(Error.Validation("Metadata.MissingExpiryDate",
-                        $"Expiry date is required for '{requiredDoc.Name}'."));
 
                 var tenant = await _tenantService.GetByIdAsync(tenantId);
-                if (tenant.Value is null)
+                if (tenant.Data is null)
                     tenantId = Guid.Empty;
                 // ── Save files into Documents/{userId}/{requiredDocId}/ ───────────────
                 var verificationRequest = new VerificationRequest
@@ -224,16 +239,19 @@ public class DocumentService : IDocumentService
                     MetadataJson = item.MetadataJson
                 };
 
-                foreach (var file in item.Files ?? [])
+                if (item.Files != null)
                 {
-                    var fileUrl = await _fileService.UploadToDocumentsAsync(
-                        file, specificDirectory: $"{userId}/{item.RequiredDocumentId}");
-
-                    verificationRequest.Documents.Add(new UserDocument
+                    foreach (var file in item.Files)
                     {
-                        FileUrl = fileUrl,
-                        FileName = file.FileName
-                    });
+                        var fileUrl = await _fileService.UploadToDocumentsAsync(
+                            file, specificDirectory: $"{userId}/{item.RequiredDocumentId}");
+
+                        verificationRequest.Documents.Add(new UserDocument
+                        {
+                            FileUrl = fileUrl,
+                            FileName = file.FileName
+                        });
+                    }
                 }
 
                 await _documentRepository.AddVerificationRequestAsync(verificationRequest);
@@ -348,7 +366,7 @@ public class DocumentService : IDocumentService
 
         await _documentRepository.UpdateVerificationRequestAsync(request);
         await _documentRepository.SaveChangesAsync();
-        return Result.Success();
+        return Result.Success(request.Status== VerificationStatus.Approved? "User is Verfied Successfully": "User is Rejected Successfully");
     }
 
     public async Task<Result<IEnumerable<VerificationRequestDto>>> GetPendingRequestsAsync()
@@ -392,5 +410,112 @@ public class DocumentService : IDocumentService
         );
 
         return Result.Success(response);
+    }
+
+    private Result ValidateDocumentMetadata(
+        RequiredDocument requiredDoc,
+        string? documentNumber,
+        DateTime? issuedAt,
+        DateTime? expiresAt)
+    {
+        // 1. Basic checks
+        if (requiredDoc.RequiresDocumentNumber && string.IsNullOrWhiteSpace(documentNumber))
+            return Result.Failure(Error.Validation("Metadata.MissingNumber", "Document number is required."));
+
+        if (requiredDoc.RequiresIssueDate && !issuedAt.HasValue)
+            return Result.Failure(Error.Validation("Metadata.MissingIssueDate", "Issue date is required."));
+
+        if (requiredDoc.RequiresExpiryDate && !expiresAt.HasValue)
+            return Result.Failure(Error.Validation("Metadata.MissingExpiryDate", "Expiry date is required."));
+
+        // 2. Dynamic Rules checks
+        if (!string.IsNullOrWhiteSpace(requiredDoc.ValidationRulesJson))
+        {
+            try
+            {
+                var options = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var rules = System.Text.Json.JsonSerializer.Deserialize<DocumentValidationRules>(requiredDoc.ValidationRulesJson, options);
+                if (rules != null)
+                {
+                    // Validate Document Number Format / Length
+                    if (!string.IsNullOrWhiteSpace(documentNumber))
+                    {
+                        if (rules.DocumentNumberMinLength.HasValue && documentNumber.Length < rules.DocumentNumberMinLength.Value)
+                        {
+                            return Result.Failure(Error.Validation("Metadata.NumberTooShort",
+                                $"Document number must be at least {rules.DocumentNumberMinLength.Value} characters."));
+                        }
+
+                        if (rules.DocumentNumberMaxLength.HasValue && documentNumber.Length > rules.DocumentNumberMaxLength.Value)
+                        {
+                            return Result.Failure(Error.Validation("Metadata.NumberTooLong",
+                                $"Document number cannot exceed {rules.DocumentNumberMaxLength.Value} characters."));
+                        }
+
+                        if (!string.IsNullOrWhiteSpace(rules.DocumentNumberRegex))
+                        {
+                            var regex = new System.Text.RegularExpressions.Regex(rules.DocumentNumberRegex);
+                            if (!regex.IsMatch(documentNumber))
+                            {
+                                return Result.Failure(Error.Validation("Metadata.NumberFormatInvalid",
+                                    "Document number format is invalid."));
+                            }
+                        }
+                    }
+
+                    // Validate duration between IssuedAt and ExpiresAt
+                    if (issuedAt.HasValue && expiresAt.HasValue)
+                    {
+                        if (expiresAt.Value <= issuedAt.Value)
+                        {
+                            return Result.Failure(Error.Validation("Metadata.ExpiryBeforeIssue",
+                                "Expiry date must be after the issue date."));
+                        }
+
+                        var totalDays = (expiresAt.Value - issuedAt.Value).TotalDays;
+
+                        if (rules.MinDurationDays.HasValue && totalDays < rules.MinDurationDays.Value)
+                        {
+                            return Result.Failure(Error.Validation("Metadata.DurationTooShort",
+                                $"Duration between issue and expiry must be at least {rules.MinDurationDays.Value} days."));
+                        }
+
+                        if (rules.MaxDurationDays.HasValue && totalDays > rules.MaxDurationDays.Value)
+                        {
+                            return Result.Failure(Error.Validation("Metadata.DurationTooLong",
+                                $"Duration between issue and expiry cannot exceed {rules.MaxDurationDays.Value} days."));
+                        }
+
+                        if (rules.MinDurationYears.HasValue || rules.MaxDurationYears.HasValue)
+                        {
+                            int yearsDiff = expiresAt.Value.Year - issuedAt.Value.Year;
+                            if (expiresAt.Value.Month < issuedAt.Value.Month || 
+                                (expiresAt.Value.Month == issuedAt.Value.Month && expiresAt.Value.Day < issuedAt.Value.Day))
+                            {
+                                yearsDiff--;
+                            }
+
+                            if (rules.MinDurationYears.HasValue && yearsDiff < rules.MinDurationYears.Value)
+                            {
+                                return Result.Failure(Error.Validation("Metadata.DurationYearsTooShort",
+                                    $"Duration between issue and expiry must be at least {rules.MinDurationYears.Value} years."));
+                            }
+
+                            if (rules.MaxDurationYears.HasValue && yearsDiff > rules.MaxDurationYears.Value)
+                            {
+                                return Result.Failure(Error.Validation("Metadata.DurationYearsTooLong",
+                                    $"Duration between issue and expiry cannot exceed {rules.MaxDurationYears.Value} years."));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return Result.Failure(Error.Validation("Metadata.InvalidValidationRules", "The document configuration contains invalid validation rules JSON."));
+            }
+        }
+
+        return Result.Success();
     }
 }

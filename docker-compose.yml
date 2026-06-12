@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  sql-server:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sql-server
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong@Pass123
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools/bin/sqlcmd", "-S", "localhost", "-U", "sa", "-P", "YourStrong@Pass123", "-Q", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  auth-api:
+    image: auth-api:latest
+    container_name: auth-api
+    build:
+      context: .
+      dockerfile: src/Auth.Api/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - AuthModule__ConnectionString=Server=sql-server;Database=AuthModuleDb;User Id=sa;Password=YourStrong@Pass123;TrustServerCertificate=True;
+    ports:
+      - "5001:8080"
+    depends_on:
+      sql-server:
+        condition: service_healthy
+
+  auth-gateway:
+    image: auth-gateway:latest
+    container_name: auth-gateway
+    build:
+      context: .
+      dockerfile: src/Auth.Gateway/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Docker
+    ports:
+      - "5000:8080"
+    depends_on:
+      - auth-api

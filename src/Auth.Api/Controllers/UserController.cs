@@ -23,7 +23,7 @@ public class UserController : ControllerBase
     public async Task<IActionResult> GetAll([FromQuery] PaginationFilter filter)
     {
         var result = await _userService.GetAllAsync(filter);
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpGet("profile")]
@@ -36,7 +36,7 @@ public class UserController : ControllerBase
 
         var result = await _userService.GetProfileAsync(userId);
         if (result.IsFailure) return NotFound(new { result.Error!.Code, result.Error.Message });
-        return Ok(result.Value);
+        return Ok(result.Data);
     }
 
     [HttpPut("{id:guid}")]

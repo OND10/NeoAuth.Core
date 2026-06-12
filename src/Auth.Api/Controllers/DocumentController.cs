@@ -90,11 +90,19 @@ public class DocumentController : ControllerBase
 
     #region Admin Endpoints (Document Management)
 
+    [HttpGet("tenant-required-docs")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAllTenantRequiredDocuments()
+    {
+        var result = await _documentService.GetTenantRequiredDocumentsAsync();
+        return Ok(result);
+    } 
+    
     [HttpGet("required-docs")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllRequiredDocuments()
     {
-        var result = await _documentService.GetTenantRequiredDocumentsAsync();
+        var result = await _documentService.GetRequiredDocumentsAsync();
         return Ok(result);
     }
 

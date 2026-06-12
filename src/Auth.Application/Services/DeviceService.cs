@@ -16,6 +16,7 @@ public class DeviceService : IDeviceService
     private readonly IRefreshTokenRepository _refreshTokenRepository;
     private readonly ITenantRepository _tenantRepository;
     private readonly UserManager<ApplicationUser> _userManager;
+    private readonly IRoleRepository _roleRepository;
 
     // Fallback when neither role nor tenant specifies a limit
     private const int DefaultMaxDevices = 5;
@@ -24,12 +25,14 @@ public class DeviceService : IDeviceService
         IDeviceRepository deviceRepository,
         IRefreshTokenRepository refreshTokenRepository,
         ITenantRepository tenantRepository,
-        UserManager<ApplicationUser> userManager)
+        UserManager<ApplicationUser> userManager,
+        IRoleRepository roleRepository)
     {
         _deviceRepository = deviceRepository;
         _refreshTokenRepository = refreshTokenRepository;
         _tenantRepository = tenantRepository;
         _userManager = userManager;
+        _roleRepository = roleRepository;
     }
 
     // ──── Registration (called during login) ────────────────────────────
@@ -202,18 +205,30 @@ public class DeviceService : IDeviceService
     /// </summary>
     private async Task<int> ResolveMaxDevicesAsync(Guid userId, Guid? tenantId)
     {
-        // 1. Check role-level override
+        // 1. Check user-level override
         var user = await _userManager.FindByIdAsync(userId.ToString());
-        if (user is not null)
+        if (user is not null && user.MaxDevicesLimit.HasValue)
         {
-            var roles = await _userManager.GetRolesAsync(user);
-            // Not ideal to loop, but role count is typically small (1–3)
-            foreach (var roleName in roles)
+            return user.MaxDevicesLimit.Value;
+        }
+
+        // 2. Check role-level override
+        var userRoles = await _roleRepository.GetRolesByUserIdAsync(userId);
+        int? highestRoleLimit = null;
+        foreach (var role in userRoles)
+        {
+            var roleLimit = await _deviceRepository.GetRoleDeviceLimitAsync(role.Id);
+            if (roleLimit is not null)
             {
-                // We need the role ID; UserManager doesn't expose it directly
-                // so we look up via the device repository which has the RoleDeviceLimit table
-                // For now, we skip role-based lookup if no role repository is injected
+                if (highestRoleLimit is null || roleLimit.MaxDevices > highestRoleLimit.Value)
+                {
+                    highestRoleLimit = roleLimit.MaxDevices;
+                }
             }
+        }
+        if (highestRoleLimit.HasValue)
+        {
+            return highestRoleLimit.Value;
         }
 
         // 2. Check tenant-level limit

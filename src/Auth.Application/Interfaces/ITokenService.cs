@@ -8,7 +8,7 @@ public interface ITokenService
     string GenerateAccessToken(ApplicationUser user, IList<string> roles, Guid? tenantId, IList<string>? permissions = null);
     string GenerateClientAccessToken(ClientApplication client, IEnumerable<string> scopes);
     string GenerateReferenceToken();
-    string GenerateRefreshToken();
+    string GenerateRefreshToken(string prefix = "");
     ClaimsPrincipal? ValidateToken(string token);
 
     /// <summary>Generates a short-lived temporary token used only for device verification.</summary>
