@@ -34,7 +34,7 @@ public record UserDocumentDto(
 
 public record CreateVerificationRequest(
     Guid RequiredDocumentId,
-    IFormFileCollection Files,
+    List<IFormFile> Files,
     string? DocumentNumber = null,
     DateTime? IssuedAt = null,
     DateTime? ExpiresAt = null,
@@ -47,7 +47,7 @@ public record BulkVerificationRequest(
 
 public record DocumentUploadItem(
     Guid RequiredDocumentId,
-    IFormFileCollection Files,
+    List<IFormFile> Files,
     string? DocumentNumber = null,
     DateTime? IssuedAt = null,
     DateTime? ExpiresAt = null,

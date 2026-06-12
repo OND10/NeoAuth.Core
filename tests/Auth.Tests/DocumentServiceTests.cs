@@ -12,13 +12,6 @@ using Xunit;
 
 namespace Auth.Tests;
 
-public class TestFormFileCollection : List<IFormFile>, IFormFileCollection
-{
-    public IFormFile? this[string name] => GetFile(name);
-    public IFormFile? GetFile(string name) => this.FirstOrDefault(f => f.Name == name);
-    public IReadOnlyList<IFormFile> GetFiles(string name) => this.Where(f => f.Name == name).ToList();
-}
-
 public class DocumentServiceTests
 {
     private readonly Mock<IDocumentRepository> _documentRepoMock;
@@ -79,7 +72,7 @@ public class DocumentServiceTests
             DocumentNumber: "ABC12345",
             IssuedAt: new DateTime(2025, 11, 5),
             ExpiresAt: new DateTime(2035, 11, 5), // exactly 10 years
-            Files: new TestFormFileCollection { fileMock.Object },
+            Files: new List<IFormFile> { fileMock.Object },
             MetadataJson: null
         );
 
@@ -117,7 +110,7 @@ public class DocumentServiceTests
             DocumentNumber: "123", // too short (length 3, min is 5)
             IssuedAt: null,
             ExpiresAt: null,
-            Files: new TestFormFileCollection(),
+            Files: new List<IFormFile>(),
             MetadataJson: null
         );
 
@@ -153,7 +146,7 @@ public class DocumentServiceTests
             DocumentNumber: "ABC12345", // mismatch
             IssuedAt: null,
             ExpiresAt: null,
-            Files: new TestFormFileCollection(),
+            Files: new List<IFormFile>(),
             MetadataJson: null
         );
 
@@ -190,7 +183,7 @@ public class DocumentServiceTests
             DocumentNumber: null,
             IssuedAt: new DateTime(2025, 11, 5),
             ExpiresAt: new DateTime(2025, 11, 15), // only 10 days, min is 30
-            Files: new TestFormFileCollection(),
+            Files: new List<IFormFile>(),
             MetadataJson: null
         );
 
@@ -227,7 +220,7 @@ public class DocumentServiceTests
             DocumentNumber: null,
             IssuedAt: new DateTime(2025, 11, 5),
             ExpiresAt: new DateTime(2035, 11, 4), // 1 day short of exactly 10 years
-            Files: new TestFormFileCollection(),
+            Files: new List<IFormFile>(),
             MetadataJson: null
         );
 

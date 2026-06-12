@@ -133,13 +133,39 @@
 							"formdata": [
 								{
 									"key": "Documents[0].RequiredDocumentId",
-									"value": "guid-here",
-									"type": "text"
+									"value": "9b03e2d9-7ce6-4efc-9fbf-54debcb2fa5d",
+									"type": "text",
+									"description": "The GUID of the required document definition."
+								},
+								{
+									"key": "Documents[0].DocumentNumber",
+									"value": "01011235871887",
+									"type": "text",
+									"description": "The document number (validated against configured rules)."
+								},
+								{
+									"key": "Documents[0].IssuedAt",
+									"value": "07-01-2026",
+									"type": "text",
+									"description": "Issue date of the document."
+								},
+								{
+									"key": "Documents[0].ExpiresAt",
+									"value": "07-01-2036",
+									"type": "text",
+									"description": "Expiry date of the document."
 								},
 								{
 									"key": "Documents[0].Files",
 									"type": "file",
-									"src": []
+									"src": "/C:/Users/Lenovo/Pictures/front_scan.jpg",
+									"description": "First file (front scan)."
+								},
+								{
+									"key": "Documents[0].Files",
+									"type": "file",
+									"src": "/C:/Users/Lenovo/Pictures/back_scan.jpg",
+									"description": "Second file (back scan). Repeat this key for additional files."
 								}
 							]
 						},
@@ -153,7 +179,8 @@
 								"document",
 								"bulk-upload"
 							]
-						}
+						},
+						"description": "Upload one or more documents with metadata for verification. Each document index (Documents[0], Documents[1]) represents a separate required document. Multiple files for the same document share the same index key (Documents[0].Files repeated)."
 					}
 				}
 			]
